@@ -6,31 +6,37 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
+from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder, SubprocVecEnv
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC, TD3
-
+from stable_baselines3.common.env_util import make_vec_env
+import multiprocessing
+n_cpu = multiprocessing.cpu_count()
 
 warnings.filterwarnings("ignore")
 register(
     id='2048-v0',
-    entry_point='envs:My2048Env'    # Use either My2048Env or Eval2048Env
+    entry_point='envs:My2048Env'
+)
+register(
+    id='2048-eval',
+    entry_point='envs:Eval2048Env'
 )
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "exp_10",
+    "run_id": "exp-5",
 
     "algorithm": PPO,
     "policy_network": "MlpPolicy",
-    "save_path": "models/exp_10",
+    "save_path": "models/exp-5",
 
-    "epoch_num": 1500,
-    "timesteps_per_epoch": 8000,
+    "epoch_num": 250,
+    "timesteps_per_epoch": 80000,
     "eval_episode_num": 100,
 }
 
 def make_env():
-    env = gym.make('2048-v0')
+    env = gym.make('2048-eval')
     return env
 
 def train(env, model, config):
@@ -70,9 +76,7 @@ def train(env, model, config):
             
             avg_highest += info[0]['highest']/config["eval_episode_num"]
             avg_score   += info[0]['score']/config["eval_episode_num"]
-
-            if highest < info[0]['highest']:
-                highest = info[0]['highest']
+            highest = max(highest, info[0]['highest'])
         
         print("Avg_score:  ", avg_score)
         print("Avg_highest:", avg_highest)
@@ -99,28 +103,26 @@ if __name__ == "__main__":
 
     # Create wandb session (Uncomment to enable wandb logging)
     run = wandb.init(
-        project="assignment_3",
+        project="assignment_3_gpu",
         config=my_config,
         sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
         id=my_config["run_id"],
-        mode="disabled",
+        mode="disabled"
     )
 
-    env = DummyVecEnv([make_env])
+    env = make_vec_env("2048-v0", n_envs=n_cpu, seed=0, vec_env_cls=SubprocVecEnv)
+    env_4_eval = DummyVecEnv([make_env])
 
     # Create model from loaded config and train
     # Note: Set verbose to 0 if you don't want info messages
     model = my_config["algorithm"](
         my_config["policy_network"], 
         env, 
-        verbose=0,
+        verbose=1,
         tensorboard_log=my_config["run_id"],
-        device="cuda",
         policy_kwargs = {
             "net_arch": dict(pi=[256, 256, 256, 256], vf=[256, 256, 256, 256]),
         },
-        learning_rate=0.001,
+        learning_rate=0.0009,
     )
-    # import ipdb; ipdb.set_trace()
-    # print(model.policy)
-    train(env, model, my_config)
+    train(env_4_eval, model, my_config)

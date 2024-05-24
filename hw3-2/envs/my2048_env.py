@@ -62,7 +62,6 @@ class My2048Env(gym.Env):
         self.observation_space = spaces.Box(0, 1, (layers, self.w, self.h), dtype=int)
         
         # TODO: Set negative reward (penalty) for illegal moves (optional)
-        # self.set_illegal_move_reward(0.)
         self.set_illegal_move_reward(-32.)
         
         self.set_max_tile(None)
@@ -112,12 +111,11 @@ class My2048Env(gym.Env):
             assert score <= 2**(self.w*self.h)
             self.add_tile()
             done = self.isend()
-            # reward = float(score)
-            reward = float(score) - 0.1 * self.foul_count
+            reward = float(score)
+            # reward = np.log2(float(score))
 
-            truncate = False
-
-            # print("Legal move, reward: ", reward)
+            if action == 2 or action == 3:
+                reward *= 1.5
 
             # TODO: Add reward according to weighted states (optional)
             weight = np.array([
@@ -125,88 +123,23 @@ class My2048Env(gym.Env):
                     [0  , 0  , 0  , 0  ],
                     [0  , 0  , 0  , 0  ],
                     [0  , 0  , 0  , 0  ]])
-            # import ipdb; ipdb.set_trace()   
-            # reward += 0
-            
-            # Normalize reward
-            # reward = reward / 2**(self.w*self.h)
+            reward += 0
             
         except IllegalMove:
-            # Try the other three directions
             logging.debug("Illegal move")
             info['illegal_move'] = True
             reward = self.illegal_move_reward
 
-            # print("Illegal move, reward: ", reward)
-            # print("Current state:\n", self.Matrix)
-            # print("Previous state: ", pre_state)
-            # print("Action: ", action)
-            # print("Total action space: ", self.action_space)
-
             # TODO: Modify this part for the agent to have a chance to explore other actions (optional)
-            # done, truncate = True, False
-
-            self.foul_count += 1
+            # done = True
             if self.foul_count >= 10:
-                done, truncate = True, False
+                done = True
                 self.foul_count = 0
             else:
-                done, truncate = False, False
-
-
-
-            # if self.foul_count >= 3:
-            #     done, truncate = True, False
-            #     self.foul_count = 0
-            #     return stack(self.Matrix), reward, done, truncate, info
-
-            # done, truncate = False, True
-            # self.foul_count += 1
-
-            # # illegal_actions = [action]
-            # try:
-            #     legal_action_space = [a for a in range(self.action_space.n) if a != action]
-            #     action = self.np_random.choice(legal_action_space)
-            #     # print("New action: ", action)
-            #     score = float(self.move(action))
-            #     # self.score += score
-            #     assert score <= 2**(self.w*self.h)
-            #     # self.Matrix = pre_state.copy()
-            #     self.add_tile()
-            #     done = self.isend()
-            #     truncate = False
-            
-            # except IllegalMove:
-            #     self.foul_count += 1
-            #     # done, truncate = False, True
-            #     done, truncate = True, False
-                # Try the other two directions
-
-                # logging.debug("Illegal move")
-                # info['illegal_move'] = True
-                # reward += self.illegal_move_reward
+                done = False
+                self.foul_count += 1
                 
-                # illegal_actions.append(action)
-                # try:
-                #     legal_action_space = [a for a in range(self.action_space.n) if a not in illegal_actions]
-                #     action = self.np_random.choice(legal_action_space)
-                #     # print("New action: ", action)
-                #     score = float(self.move(action))
-                #     # self.score += score
-                #     assert score <= 2**(self.w*self.h)
-                #     self.add_tile()
-                #     done = self.isend()
-                #     truncate = True
-
-                # except IllegalMove:
-                #     # logging.debug("Illegal move")
-                #     # info['illegal_move'] = True
-                #     # reward += self.illegal_move_reward
-                #     done = False
-                #     truncate = True
-
-        # truncate = False
-
+        truncate = False
         info['highest'] = self.highest()
         info['score']   = self.score
 
